@@ -8,7 +8,73 @@ import { ChatDrawer } from '../components/ChatDrawer';
 import { Footer } from '../components/Footer';
 import { ScrollToTop } from '../components/ScrollToTop';
 import { supabase, CandidateProfile, Experience, Skill } from '../lib/supabase';
-import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle, RefreshCw } from 'lucide-react';
+
+const CACHE_KEY = 'portfolio_cache';
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+interface CachedData {
+  profile: CandidateProfile;
+  experiences: Experience[];
+  skills: Skill[];
+  timestamp: number;
+}
+
+function SkeletonLoader() {
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] text-white">
+      {/* Navigation skeleton */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/5">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="w-10 h-10 bg-white/10 rounded-lg animate-pulse" />
+          <div className="w-24 h-10 bg-white/10 rounded-lg animate-pulse" />
+        </div>
+      </nav>
+
+      {/* Hero skeleton */}
+      <section className="pt-32 pb-24 px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="w-24 h-24 bg-white/10 rounded-full mx-auto mb-6 animate-pulse" />
+          <div className="h-12 bg-white/10 rounded-lg w-3/4 mx-auto mb-4 animate-pulse" />
+          <div className="h-6 bg-white/10 rounded-lg w-1/2 mx-auto mb-8 animate-pulse" />
+          <div className="space-y-3 max-w-2xl mx-auto">
+            <div className="h-4 bg-white/5 rounded w-full animate-pulse" />
+            <div className="h-4 bg-white/5 rounded w-5/6 animate-pulse" />
+            <div className="h-4 bg-white/5 rounded w-4/5 animate-pulse" />
+          </div>
+          <div className="flex gap-4 justify-center mt-8">
+            <div className="w-32 h-12 bg-white/10 rounded-lg animate-pulse" />
+            <div className="w-32 h-12 bg-white/10 rounded-lg animate-pulse" />
+          </div>
+        </div>
+      </section>
+
+      {/* Experience skeleton */}
+      <section className="py-24 px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="h-10 bg-white/10 rounded-lg w-64 mx-auto mb-12 animate-pulse" />
+          <div className="space-y-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white/5 rounded-2xl p-6 border border-white/10">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <div className="h-6 bg-white/10 rounded w-48 mb-2 animate-pulse" />
+                    <div className="h-4 bg-white/5 rounded w-32 animate-pulse" />
+                  </div>
+                  <div className="h-6 bg-white/10 rounded w-24 animate-pulse" />
+                </div>
+                <div className="space-y-2">
+                  <div className="h-3 bg-white/5 rounded w-full animate-pulse" />
+                  <div className="h-3 bg-white/5 rounded w-5/6 animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
 
 export function HomePage() {
   const [profile, setProfile] = useState<CandidateProfile | null>(null);
@@ -23,7 +89,49 @@ export function HomePage() {
   }, []);
 
   const loadData = async () => {
-    setLoading(true);
+    // Try to load from cache first for instant display
+    const cached = loadFromCache();
+    if (cached) {
+      setProfile(cached.profile);
+      setExperiences(cached.experiences);
+      setSkills(cached.skills);
+      setLoading(false);
+      
+      // Refresh in background if cache is stale
+      if (Date.now() - cached.timestamp > CACHE_DURATION) {
+        fetchFreshData(false);
+      }
+      return;
+    }
+
+    // No cache, fetch fresh data
+    await fetchFreshData(true);
+  };
+
+  const loadFromCache = (): CachedData | null => {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (e) {
+      console.error('Cache read error:', e);
+    }
+    return null;
+  };
+
+  const saveToCache = (data: CachedData) => {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    } catch (e) {
+      console.error('Cache write error:', e);
+    }
+  };
+
+  const fetchFreshData = async (showLoading: boolean) => {
+    if (showLoading) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -43,24 +151,34 @@ export function HomePage() {
         throw new Error('Profile not found');
       }
 
-      setProfile(profileRes.data);
-      setExperiences(experiencesRes.data || []);
-      setSkills(skillsRes.data || []);
+      const freshData = {
+        profile: profileRes.data,
+        experiences: experiencesRes.data || [],
+        skills: skillsRes.data || [],
+        timestamp: Date.now()
+      };
+
+      // Save to cache
+      saveToCache(freshData);
+
+      // Update state
+      setProfile(freshData.profile);
+      setExperiences(freshData.experiences);
+      setSkills(freshData.skills);
     } catch (err) {
       console.error('Error loading data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load portfolio data');
+      if (showLoading) {
+        setError(err instanceof Error ? err.message : 'Failed to load portfolio data');
+      }
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center gap-4">
-        <Loader2 className="w-8 h-8 text-[#3b82f6] animate-spin" />
-        <p className="text-gray-400">Loading portfolio...</p>
-      </div>
-    );
+    return <SkeletonLoader />;
   }
 
   if (error || !profile) {
@@ -74,7 +192,7 @@ export function HomePage() {
           <p className="text-gray-400 max-w-md">{error || 'Profile data not found'}</p>
         </div>
         <button
-          onClick={loadData}
+          onClick={() => fetchFreshData(true)}
           className="flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl text-white transition-all"
         >
           <RefreshCw className="w-4 h-4" />
