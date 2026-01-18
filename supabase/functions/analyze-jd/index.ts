@@ -130,9 +130,21 @@ Deno.serve(async (req: Request) => {
     }
 
     const anthropicData = await anthropicResponse.json();
-    const aiResponse = anthropicData.content[0].text;
+       let aiResponse = anthropicData.content[0].text;
 
-    let analysis: AnalysisResult;
+       // Strip markdown code fences if present
+       aiResponse = aiResponse.trim();
+       if (aiResponse.startsWith("```json")) {
+         aiResponse = aiResponse.slice(7);
+       } else if (aiResponse.startsWith("```")) {
+         aiResponse = aiResponse.slice(3);
+       }
+       if (aiResponse.endsWith("```")) {
+         aiResponse = aiResponse.slice(0, -3);
+       }
+       aiResponse = aiResponse.trim();
+
+       let analysis: AnalysisResult;
     try {
       analysis = JSON.parse(aiResponse);
     } catch (parseError) {
