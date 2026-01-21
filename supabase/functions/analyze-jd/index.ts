@@ -60,12 +60,14 @@ Deno.serve(async (req: Request) => {
       skillsRes,
       gapsRes,
       valuesRes,
+      instructionsRes,
     ] = await Promise.all([
       supabase.from("candidate_profile").select("*").eq("id", candidateId).maybeSingle(),
       supabase.from("experiences").select("*").eq("candidate_id", candidateId).order("display_order"),
       supabase.from("skills").select("*").eq("candidate_id", candidateId).order("display_order"),
       supabase.from("gaps_weaknesses").select("*").eq("candidate_id", candidateId),
       supabase.from("values_culture").select("*").eq("candidate_id", candidateId).maybeSingle(),
+      supabase.from("ai_instructions").select("*").eq("candidate_id", candidateId).order("priority"),
     ]);
 
     const profile = profileRes.data;
@@ -73,6 +75,7 @@ Deno.serve(async (req: Request) => {
     const skills = skillsRes.data || [];
     const gaps = gapsRes.data || [];
     const values = valuesRes.data;
+    const instructions = instructionsRes.data || [];
 
     if (!profile) {
       return new Response(
@@ -84,7 +87,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const systemPrompt = buildAnalysisPrompt(profile, experiences, skills, gaps, values);
+    const systemPrompt = buildAnalysisPrompt(profile, experiences, skills, gaps, values, instructions);
 
     const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!anthropicApiKey) {
@@ -130,21 +133,21 @@ Deno.serve(async (req: Request) => {
     }
 
     const anthropicData = await anthropicResponse.json();
-       let aiResponse = anthropicData.content[0].text;
+    let aiResponse = anthropicData.content[0].text;
 
-       // Strip markdown code fences if present
-       aiResponse = aiResponse.trim();
-       if (aiResponse.startsWith("```json")) {
-         aiResponse = aiResponse.slice(7);
-       } else if (aiResponse.startsWith("```")) {
-         aiResponse = aiResponse.slice(3);
-       }
-       if (aiResponse.endsWith("```")) {
-         aiResponse = aiResponse.slice(0, -3);
-       }
-       aiResponse = aiResponse.trim();
+    // Strip markdown code fences if present
+    aiResponse = aiResponse.trim();
+    if (aiResponse.startsWith("```json")) {
+      aiResponse = aiResponse.slice(7);
+    } else if (aiResponse.startsWith("```")) {
+      aiResponse = aiResponse.slice(3);
+    }
+    if (aiResponse.endsWith("```")) {
+      aiResponse = aiResponse.slice(0, -3);
+    }
+    aiResponse = aiResponse.trim();
 
-       let analysis: AnalysisResult;
+    let analysis: AnalysisResult;
     try {
       analysis = JSON.parse(aiResponse);
     } catch (parseError) {
@@ -181,7 +184,8 @@ function buildAnalysisPrompt(
   experiences: any[],
   skills: any[],
   gaps: any[],
-  values: any
+  values: any,
+  instructions: any[]
 ): string {
   const strongSkills = skills.filter(s => s.category === "strong");
   const gapSkills = skills.filter(s => s.category === "gap");
@@ -195,6 +199,18 @@ Your assessment MUST:
 3. Explain what DOES transfer even if it's not a perfect fit
 4. Give a clear recommendation
 
+## CRITICAL INSTRUCTIONS - READ THESE FIRST
+
+`;
+
+  // Add ai_instructions at the TOP of the prompt so they take priority
+  if (instructions.length > 0) {
+    instructions.forEach(inst => {
+      prompt += `- ${inst.instruction}\n`;
+    });
+  }
+
+  prompt += `
 ## ABOUT ${profile.name}
 
 ${profile.elevator_pitch}
@@ -204,24 +220,32 @@ Target roles: ${profile.target_titles?.join(", ") || "N/A"}
 Looking for: ${profile.looking_for}
 NOT looking for: ${profile.not_looking_for}
 
-## EXPERIENCE SUMMARY
+## EXPERIENCE SUMMARY (WITH LEADERSHIP DETAILS)
 
 `;
 
+  // Include more detail about each experience, including leadership
   experiences.forEach(exp => {
     const startYear = new Date(exp.start_date).getFullYear();
     const endYear = exp.end_date ? new Date(exp.end_date).getFullYear() : "Present";
-    prompt += `- ${exp.company_name} (${startYear}–${endYear}): ${exp.title}\n`;
+    prompt += `### ${exp.company_name} (${startYear}-${endYear}): ${exp.title}\n`;
+    if (exp.actual_contributions) {
+      prompt += `${exp.actual_contributions}\n`;
+    }
+    if (exp.manager_would_say) {
+      prompt += `Manager perspective: ${exp.manager_would_say}\n`;
+    }
+    prompt += `\n`;
   });
 
-  prompt += `\n## STRONG SKILLS\n`;
+  prompt += `## STRONG SKILLS\n`;
   strongSkills.forEach(skill => {
     prompt += `- ${skill.skill_name}`;
     if (skill.honest_notes) prompt += ` (${skill.honest_notes})`;
     prompt += `\n`;
   });
 
-  prompt += `\n## KNOWN GAPS\n`;
+  prompt += `\n## KNOWN GAPS (Be careful - only list these as gaps if they are ACTUALLY gaps)\n`;
   gapSkills.forEach(skill => {
     prompt += `- ${skill.skill_name}`;
     if (skill.honest_notes) prompt += ` (${skill.honest_notes})`;
@@ -263,10 +287,12 @@ Respond ONLY with valid JSON in this exact format:
 
 Rules:
 - Speak in first person as ${profile.name}
-- Be brutally honest
+- Be brutally honest about ACTUAL gaps, but do NOT invent gaps that don't exist
+- If the CRITICAL INSTRUCTIONS say something is a strength, do NOT list it as a gap
 - If there are NO gaps, use an empty array for gaps
 - If it's a bad fit, say so directly
-- Don't sugarcoat anything`;
+- Don't sugarcoat anything
+- Never use em dashes; use commas, semicolons, or separate sentences instead`;
 
   return prompt;
 }
