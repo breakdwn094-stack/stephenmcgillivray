@@ -65,25 +65,30 @@ def redact_pii(text: str) -> str:
     return result
 
 
+def _redact_args(args: tuple[Any, ...]) -> tuple[Any, ...]:
+    """Redact PII from each positional arg before %-formatting."""
+    return tuple(redact_pii(str(a)) if isinstance(a, str) else a for a in args)
+
+
 def log_info(msg: str, *args: Any) -> None:
-    """Log an info-level message. PII is always redacted."""
-    _logger.info(redact_pii(msg), *args)
+    """Log an info-level message. PII is always redacted (msg and args)."""
+    _logger.info(redact_pii(msg), *_redact_args(args))
 
 
 def log_debug(msg: str, *args: Any) -> None:
     """Log a debug message. Only emitted in dev mode. PII is redacted."""
     if not _is_production():
-        _logger.debug(redact_pii(msg), *args)
+        _logger.debug(redact_pii(msg), *_redact_args(args))
 
 
 def log_warning(msg: str, *args: Any) -> None:
-    """Log a warning. PII is redacted."""
-    _logger.warning(redact_pii(msg), *args)
+    """Log a warning. PII is redacted (msg and args)."""
+    _logger.warning(redact_pii(msg), *_redact_args(args))
 
 
 def log_error(msg: str, *args: Any) -> None:
-    """Log an error. PII is redacted."""
-    _logger.error(redact_pii(msg), *args)
+    """Log an error. PII is redacted (msg and args)."""
+    _logger.error(redact_pii(msg), *_redact_args(args))
 
 
 def log_dev_unsafe(msg: str, *args: Any) -> None:

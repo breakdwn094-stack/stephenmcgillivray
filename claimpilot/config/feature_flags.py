@@ -25,5 +25,9 @@ ENABLE_ATTORNEY_MARKETPLACE: bool = _flag("ENABLE_ATTORNEY_MARKETPLACE", False)
 # When True, the app is in production mode (no debug logging, no PII in console).
 PRODUCTION_MODE: bool = _flag("CLAIMPILOT_PRODUCTION", True)
 
+# Show placeholder policy text (refund, terms drafts). Default OFF.
+# Only enable during internal review / staging.
+SHOW_PLACEHOLDER_POLICIES: bool = _flag("SHOW_PLACEHOLDER_POLICIES", False)
+
 # When True, enable detailed analytics/telemetry (requires consent).
 ENABLE_ANALYTICS: bool = _flag("ENABLE_ANALYTICS", False)

@@ -20,6 +20,7 @@ from components.document_viewer import render_document_viewer
 from components.evidence_manager import render_evidence_manager
 from components.intake_form import render_intake_form
 from components.state_selector import render_state_selector
+from config.feature_flags import SHOW_PLACEHOLDER_POLICIES
 from config.settings import (
     APP_NAME,
     APP_TAGLINE,
@@ -47,11 +48,16 @@ def _render_privacy_tab() -> None:
     st.markdown(LEGAL_DISCLAIMER)
 
     st.subheader("Refund Policy")
-    st.markdown(
-        "[REFUND POLICY PLACEHOLDER] "
-        "Refund terms to be finalized before public launch. "
-        f"Contact {SUPPORT_EMAIL} for questions."
-    )
+    if SHOW_PLACEHOLDER_POLICIES:
+        st.markdown(
+            "[REFUND POLICY PLACEHOLDER] "
+            "Refund terms to be finalized before public launch. "
+            f"Contact {SUPPORT_EMAIL} for questions."
+        )
+    else:
+        st.markdown(
+            f"For refund inquiries, please contact **{SUPPORT_EMAIL}**."
+        )
 
     st.subheader("Support")
     st.markdown(f"For questions or issues, contact: **{SUPPORT_EMAIL}**")
@@ -116,16 +122,16 @@ with st.sidebar:
     if selected_state:
         intake = get_intake_data()
         if intake.get("claimant_name") and intake.get("description"):
-            if st.button("Download case binder (ZIP)", key="export_binder", type="primary"):
-                evidence = get_evidence_items()
-                binder_bytes = generate_binder_zip(intake, evidence, selected_state)
-                st.download_button(
-                    label="Save binder ZIP",
-                    data=binder_bytes,
-                    file_name=f"ClaimPilot_Binder_{selected_state}.zip",
-                    mime="application/zip",
-                    key="download_binder",
-                )
+            evidence = get_evidence_items()
+            binder_bytes = generate_binder_zip(intake, evidence, selected_state)
+            st.download_button(
+                label="Download case binder (ZIP)",
+                data=binder_bytes,
+                file_name=f"ClaimPilot_Binder_{selected_state}.zip",
+                mime="application/zip",
+                key="download_binder",
+                type="primary",
+            )
         else:
             st.info("Complete the intake form to enable export.")
     else:

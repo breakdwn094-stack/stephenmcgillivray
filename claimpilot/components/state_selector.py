@@ -8,7 +8,7 @@ from typing import Optional
 
 import streamlit as st
 
-from config.states import ALL_STATES, TIER1_STATES, tier_label
+from config.states import ALL_STATES, tier_label
 from core.data_manager import get_selected_state, set_selected_state
 
 

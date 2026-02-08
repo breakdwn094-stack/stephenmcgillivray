@@ -10,7 +10,10 @@ from typing import Optional
 
 import streamlit as st
 
-from config.states import StateCoverage, get_state
+from config.states import get_state
+
+# Re-export so existing callers (e.g. tests) that import from here keep working.
+from core.sources import sources_for_export  # noqa: F401
 
 
 def render_sources_section(state_abbr: Optional[str]) -> None:
@@ -55,31 +58,3 @@ def render_sources_section(state_abbr: Optional[str]) -> None:
             "providers but may not reflect the latest changes. "
             "Always verify with your local court clerk before filing."
         )
-
-
-def sources_for_export(state_abbr: Optional[str]) -> dict:
-    """Return source data formatted for JSON export."""
-    if not state_abbr:
-        return {"state": None, "sources": [], "coverage_tier": None}
-
-    state = get_state(state_abbr)
-    if not state:
-        return {"state": state_abbr, "sources": [], "coverage_tier": None}
-
-    return {
-        "state": state.abbreviation,
-        "state_name": state.name,
-        "coverage_tier": state.tier,
-        "coverage_label": f"Tier {state.tier}" + (
-            " - Supported" if state.tier == 1 else " - Guidance-only"
-        ),
-        "sources": [
-            {
-                "url": s.url,
-                "label": s.label,
-                "source_quality": s.source_quality,
-                "last_reviewed_iso": s.last_reviewed_iso,
-            }
-            for s in state.sources
-        ],
-    }

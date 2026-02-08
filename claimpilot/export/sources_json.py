@@ -8,7 +8,7 @@ import json
 from datetime import date
 from typing import Optional
 
-from components.sources_verification import sources_for_export
+from core.sources import sources_for_export
 from config.settings import APP_VERSION
 
 

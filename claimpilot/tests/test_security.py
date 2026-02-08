@@ -158,3 +158,70 @@ class TestPIIFieldDetection:
     def test_normal_field_not_flagged(self):
         assert not contains_pii_field_name("claim_type")
         assert not contains_pii_field_name("amount")
+
+
+class TestLoggerRedactsFormattedArgs:
+    """PII in %-format args must be redacted before final log output (fix A)."""
+
+    def test_email_in_args_redacted(self, monkeypatch, caplog):
+        monkeypatch.setenv("CLAIMPILOT_PRODUCTION", "false")
+        import core.logger as lg
+        importlib.reload(lg)
+        with caplog.at_level(logging.DEBUG, logger="claimpilot"):
+            lg.log_info("User email: %s", "test@example.com")
+        assert "test@example.com" not in caplog.text
+        assert "[EMAIL-REDACTED]" in caplog.text
+
+    def test_ssn_in_args_redacted(self, monkeypatch, caplog):
+        monkeypatch.setenv("CLAIMPILOT_PRODUCTION", "false")
+        import core.logger as lg
+        importlib.reload(lg)
+        with caplog.at_level(logging.DEBUG, logger="claimpilot"):
+            lg.log_warning("SSN is %s", "123-45-6789")
+        assert "123-45-6789" not in caplog.text
+        assert "[SSN-REDACTED]" in caplog.text
+
+    def test_phone_in_args_redacted(self, monkeypatch, caplog):
+        monkeypatch.setenv("CLAIMPILOT_PRODUCTION", "false")
+        import core.logger as lg
+        importlib.reload(lg)
+        with caplog.at_level(logging.DEBUG, logger="claimpilot"):
+            lg.log_error("Phone: %s", "555-123-4567")
+        assert "555-123-4567" not in caplog.text
+
+    def test_debug_args_redacted(self, monkeypatch, caplog):
+        monkeypatch.setenv("CLAIMPILOT_PRODUCTION", "false")
+        import core.logger as lg
+        importlib.reload(lg)
+        with caplog.at_level(logging.DEBUG, logger="claimpilot"):
+            lg.log_debug("Contact %s at %s", "user@leak.com", "555.999.1234")
+        assert "user@leak.com" not in caplog.text
+        assert "555.999.1234" not in caplog.text
+
+
+class TestExportNoStreamlitImport:
+    """Export modules must not depend on Streamlit (fix D)."""
+
+    def test_export_sources_json_no_streamlit_import(self):
+        """export/sources_json.py must not import streamlit directly."""
+        src_path = os.path.join(os.path.dirname(__file__), "..", "export", "sources_json.py")
+        with open(src_path) as fh:
+            content = fh.read()
+        assert "import streamlit" not in content
+        assert "from streamlit" not in content
+
+    def test_core_sources_no_streamlit_import(self):
+        """core/sources.py must not import streamlit."""
+        src_path = os.path.join(os.path.dirname(__file__), "..", "core", "sources.py")
+        with open(src_path) as fh:
+            content = fh.read()
+        assert "import streamlit" not in content
+        assert "from streamlit" not in content
+
+    def test_export_binder_no_streamlit_import(self):
+        """export/binder.py must not import streamlit."""
+        src_path = os.path.join(os.path.dirname(__file__), "..", "export", "binder.py")
+        with open(src_path) as fh:
+            content = fh.read()
+        assert "import streamlit" not in content
+        assert "from streamlit" not in content
