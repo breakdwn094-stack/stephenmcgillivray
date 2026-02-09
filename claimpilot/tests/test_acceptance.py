@@ -36,7 +36,7 @@ class TestGate1CoverageHonesty:
 
     def test_tier1_states_list(self):
         """There must be a defined list of Tier 1 states."""
-        assert TIER1_STATES == sorted(["CA", "FL", "IL", "NY", "TX"])
+        assert TIER1_STATES == sorted(["CA", "FL", "GA", "IL", "NJ", "NY", "OH", "PA", "TX", "WA"])
 
     def test_tier2_never_has_official_form_url(self):
         for abbr in TIER2_STATES:
@@ -50,7 +50,7 @@ class TestGate1CoverageHonesty:
 
     def test_tier_labels_are_distinct(self):
         t1 = tier_label("CA")
-        t2 = tier_label("WA")
+        t2 = tier_label("OR")
         assert t1 != t2
         assert "Supported" in t1
         assert "Guidance" in t2
@@ -61,14 +61,14 @@ class TestGate1CoverageHonesty:
         assert len(set(TIER1_STATES) & set(TIER2_STATES)) == 0
 
     def test_coverage_in_export_sources_json(self):
-        for abbr in ["CA", "WA"]:
+        for abbr in ["CA", "OR"]:
             data = sources_for_export(abbr)
             assert "coverage_tier" in data
             assert "coverage_label" in data
             assert data["coverage_tier"] in (1, 2)
 
     def test_coverage_in_case_summary(self, sample_intake, sample_evidence):
-        for state, expected_tier in [("CA", 1), ("WA", 2)]:
+        for state, expected_tier in [("CA", 1), ("OR", 2)]:
             content = generate_case_summary_json(sample_intake, sample_evidence, state)
             data = json.loads(content)
             assert data["coverage_tier"] == expected_tier

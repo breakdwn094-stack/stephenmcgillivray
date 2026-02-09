@@ -66,7 +66,7 @@ def tier1_state() -> str:
 
 @pytest.fixture
 def tier2_state() -> str:
-    return "WA"
+    return "OR"
 
 
 @pytest.fixture(autouse=True)
