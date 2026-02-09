@@ -29,3 +29,9 @@ npm-debug.log*
 
 # Vite cache
 .vite/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
