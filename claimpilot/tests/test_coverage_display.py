@@ -48,7 +48,7 @@ class TestTierClassification:
         assert len(overlap) == 0, f"States in both tiers: {overlap}"
 
     def test_tier1_contains_expected(self):
-        for abbr in ["CA", "TX", "NY", "FL", "IL"]:
+        for abbr in ["CA", "TX", "NY", "FL", "IL", "GA", "NJ", "OH", "PA", "WA"]:
             assert is_tier1(abbr), f"{abbr} should be Tier 1"
 
     def test_tier2_does_not_contain_tier1(self):
@@ -94,7 +94,7 @@ class TestCoverageBadges:
         assert label == "Supported (Tier 1)"
 
     def test_tier2_badge_format(self):
-        label = tier_label("WA")
+        label = tier_label("OR")
         assert label == "Guidance-only (Tier 2)"
 
 
@@ -112,7 +112,7 @@ class TestExportCoverageStatus:
             assert "last_reviewed_iso" in src
 
     def test_sources_export_tier2(self):
-        data = sources_for_export("WA")
+        data = sources_for_export("OR")
         assert data["coverage_tier"] == 2
         assert "Guidance-only" in data["coverage_label"]
         assert len(data["sources"]) > 0
